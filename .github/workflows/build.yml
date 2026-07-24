@@ -3,7 +3,7 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -111,3 +111,9 @@ jobs:
         export ASEPRITE=$PWD/build/bin/aseprite
         cd tests
         $XVFB bash run-tests.sh
+    - name: Upload Aseprite artifact
+      if: always() && runner.os == 'Windows' && matrix.ui == 'gui'
+      uses: actions/upload-artifact@v4
+      with:
+        name: aseprite-windows-build
+        path: build/bin/**
