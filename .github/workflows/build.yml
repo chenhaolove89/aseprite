@@ -111,66 +111,24 @@ jobs:
         export ASEPRITE=$PWD/build/bin/aseprite
         cd tests
         $XVFB bash run-tests.sh
-    - name: Copy Windows dependencies
+    - name: Clean up build folder
       if: runner.os == 'Windows' && matrix.ui == 'gui'
+      working-directory: build/bin
+      shell: bash
+      run: find . -mindepth 1 ! \( -name 'aseprite.exe' -o -name 'data' -prune \) -exec rm -rf {} +
+    - name: Make portable Windows zip
+      if: runner.os == 'Windows' && matrix.ui == 'gui'
+      working-directory: build/bin
       shell: pwsh
       run: |
-        $binDir = "build/bin"
-        $exe = "$binDir/aseprite.exe"
-        # 使用 dumpbin 分析依赖
-        $output = & dumpbin /DEPENDENTS $exe 2>$null
-        $inDeps = $false
-        $deps = @()
-        foreach ($line in $output) {
-          if ($line -match "Image has the following dependencies:") {
-            $inDeps = $true
-            continue
-          }
-          if ($line -match "Summary") {
-            $inDeps = $false
-            continue
-          }
-          if ($inDeps) {
-            $dep = $line.Trim()
-            if ($dep -and $dep -notmatch "^\s*$") {
-              $deps += $dep
-            }
-          }
-        }
-        # 搜索并复制 DLL
-        $searchPaths = @(
-          "C:\vcpkg\installed\x64-windows\bin",
-          "C:\Program Files\OpenSSL\bin",
-          "C:\Program Files (x86)\OpenSSL\bin",
-          "C:\Windows\System32"
-        )
-        $systemDlls = @("kernel32","user32","gdi32","advapi32","shell32","ole32","oleaut32","ws2_32","msvcrt","ntdll","comdlg32","winspool","version","imm32","msimg32","shlwapi","comctl32","crypt32","wldap32","rpcrt4","userenv","iphlpapi","netapi32","secur32","dnsapi","mswsock","bcrypt","ncrypt","cryptbase","dhcpcsvc","sechost","profapi","api-ms-win")
-        foreach ($dep in $deps) {
-          $isSystem = $false
-          foreach ($sys in $systemDlls) {
-            if ($dep -match "^$sys") {
-              $isSystem = $true
-              break
-            }
-          }
-          if ($isSystem) { continue }
-          $found = $false
-          foreach ($path in $searchPaths) {
-            $dllPath = Join-Path $path $dep
-            if (Test-Path $dllPath) {
-              Copy-Item $dllPath $binDir -Force
-              Write-Output "Copied $dep from $path"
-              $found = $true
-              break
-            }
-          }
-          if (-not $found) {
-            Write-Output "Warning: Could not find $dep"
-          }
-        }
+        Add-Type -A System.IO.Compression.FileSystem
+        $zipName = "Aseprite-windows.zip"
+        if (Test-Path $zipName) { Remove-Item $zipName -Force }
+        [System.IO.Compression.ZipFile]::CreateFromDirectory($PWD, $zipName, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+        Write-Output "Created $zipName ($([math]::Round((Get-Item $zipName).Length / 1MB, 2)) MB)"
     - name: Upload Aseprite artifact
       if: always() && runner.os == 'Windows' && matrix.ui == 'gui'
       uses: actions/upload-artifact@v4
       with:
-        name: aseprite-windows-build
-        path: build/bin/**
+        name: aseprite-windows
+        path: build/bin/Aseprite-windows.zip
