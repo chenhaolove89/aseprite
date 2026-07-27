@@ -115,20 +115,31 @@ jobs:
       if: runner.os == 'Windows' && matrix.ui == 'gui'
       working-directory: build/bin
       shell: bash
-      run: find . -mindepth 1 ! \( -name 'aseprite.exe' -o -name 'data' -prune \) -exec rm -rf {} +
+      run: |
+        # 裁剪产物,只保留 aseprite.exe、aseprite.pdb 和 data 目录
+        cd "$GITHUB_WORKSPACE/build/bin"
+        find . -mindepth 1 ! \( -name 'aseprite.exe' -o -name 'aseprite.pdb' -o -name 'data' -prune \) -exec rm -rf {} +
+        echo "--- 裁剪后剩余文件 ---"
+        ls -la
     - name: Make portable Windows zip
       if: runner.os == 'Windows' && matrix.ui == 'gui'
-      working-directory: build/bin
+      working-directory: ${{ github.workspace }}/build/bin
       shell: pwsh
       run: |
-        Add-Type -A System.IO.Compression.FileSystem
-        $zipName = "Aseprite-windows.zip"
-        if (Test-Path $zipName) { Remove-Item $zipName -Force }
-        [System.IO.Compression.ZipFile]::CreateFromDirectory($PWD, $zipName, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-        Write-Output "Created $zipName ($([math]::Round((Get-Item $zipName).Length / 1MB, 2)) MB)"
+        $sourceDir = "$env:GITHUB_WORKSPACE\build\bin"
+        $zipPath = "$env:GITHUB_WORKSPACE\Aseprite-windows.zip"
+        if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+        Write-Output "压缩目录: $sourceDir"
+        Get-ChildItem $sourceDir -Force | ForEach-Object { Write-Output "  - $($_.Name)" }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        Add-Type -AssemblyName System.IO.Compression
+        [System.IO.Compression.ZipFile]::CreateFromDirectory($sourceDir, $zipPath, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+        $size = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
+        Write-Output "已创建 $zipPath ($size MB)"
     - name: Upload Aseprite artifact
       if: always() && runner.os == 'Windows' && matrix.ui == 'gui'
       uses: actions/upload-artifact@v4
       with:
         name: aseprite-windows
-        path: build/bin/Aseprite-windows.zip
+        path: ${{ github.workspace }}/Aseprite-windows.zip
+        if-no-files-found: error
