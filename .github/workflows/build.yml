@@ -116,9 +116,9 @@ jobs:
       working-directory: build/bin
       shell: bash
       run: |
-        # 裁剪产物,只保留 aseprite.exe、aseprite.pdb 和 data 目录
+        # 裁剪产物,只保留 aseprite.exe 和 data 目录(删除 .pdb、.ilk、测试程序、示例程序等)
         cd "$GITHUB_WORKSPACE/build/bin"
-        find . -mindepth 1 ! \( -name 'aseprite.exe' -o -name 'aseprite.pdb' -o -name 'data' -prune \) -exec rm -rf {} +
+        find . -mindepth 1 ! \( -name 'aseprite.exe' -o -name 'data' -prune \) -exec rm -rf {} +
         echo "--- 裁剪后剩余文件 ---"
         ls -la
     - name: Make portable Windows zip
